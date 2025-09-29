@@ -1,0 +1,40 @@
+name: CI & Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Step 2: Deploy to VM via SSH
+      - name: Deploy to VM
+        uses: appleboy/ssh-action@v0.1.9
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_KEY }}
+          port: 22
+          script: |
+            echo "Navigating to project directory..."
+            cd /home/ubuntu/Tour-Project
+
+            echo "Pulling latest code..."
+            git pull origin main || true
+
+            echo "Stopping old container if exists..."
+            docker stop tour-test || true
+            docker rm tour-test || true
+
+            echo "Building Docker image on the VM..."
+            docker build -t tour-project .
+
+            echo "Running new container..."
+            docker run -d --restart unless-stopped -p 8087:80 --name tour-test tour-project
